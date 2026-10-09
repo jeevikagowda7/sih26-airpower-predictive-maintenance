@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
+from planner import make_plan, availability
 
 st.set_page_config(page_title="Air Power - Fleet Readiness", layout="wide")
 
@@ -38,7 +39,7 @@ def color_status(val):
     return f"background-color: {c}; color: white; font-weight: bold" if c else ""
 
 def style_status(df):
-    styler = df.style
+    styler = df.style.format(precision=1)
     # pandas 2.1+ uses .map ; older versions use .applymap
     if hasattr(styler, "map"):
         return styler.map(color_status, subset=["status"])
@@ -87,9 +88,8 @@ st.caption("Ready tomorrow = GREEN + YELLOW. RED aircraft are treated as not rea
 # ---------------------------------------------------------------------
 # Tabs
 # ---------------------------------------------------------------------
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Fleet table", "Alerts & priorities", "Aircraft detail", "Simulated data & accuracy"])
-
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+["Fleet table", "Alerts & priorities", "Aircraft detail", "Simulated data & accuracy","7-day forecast & what-if"])
 # ---- Tab 1: fleet table
 with tab1:
     st.subheader("Fleet table")
@@ -197,5 +197,79 @@ with tab4:
     m2.metric("RMSE", f"{rmse:.1f} flights")
     m3.metric("At-risk engines caught as RED", f"{caught} / {int(truly.sum())}")
     m4.metric("False RED alarms", false_red)
-    st.caption("Honest note: the model is not perfect. Some at-risk engines are missed, "
-               "and the 10-flight safety margin was chosen after looking at test results.")
+    st.caption("Honest note: the model is not perfect. Some at-risk engines are missed, ""and the 10-flight safety margin was chosen after looking at test results.")
+
+    # ---- Tab 5: forecast + what-if
+with tab5:
+    st.subheader("7-day fleet availability forecast + what-if")
+    st.caption("Move the sliders to test 'what if' questions. Everything here uses our "
+               "SIMULATED spares and slots, plus assumptions listed at the bottom.")
+
+    s1, s2, s3 = st.columns(3)
+    extra_spares = s1.slider("Extra spare modules per base", 0, 4, 0)
+    extra_delay = s2.slider("Spares delivery delay (extra days)", 0, 5, 0)
+    slots_lost = s3.slider("Hangar slots lost per day per base", 0, 2, 0)
+    s4, s5, s6 = st.columns(3)
+    maint_days = s4.slider("Days in hangar per planned maintenance", 1, 4, 2)
+    unplanned_extra = s5.slider("Extra days lost if a failure is a surprise", 0, 6, 3)
+
+    plan = make_plan(fleet, spares, slots, extra_resupply=extra_delay,
+                     extra_spares=extra_spares, slots_lost=slots_lost)
+
+    est_nothing, u_est_nothing = availability(plan, "days_left", False,
+                                              maint_days, unplanned_extra)
+    est_plan, u_est_plan = availability(plan, "days_left", True,
+                                        maint_days, unplanned_extra)
+    true_nothing, u_true_nothing = availability(plan, "true_days_left", False,
+                                                maint_days, unplanned_extra)
+    true_plan, u_true_plan = availability(plan, "true_days_left", True,
+                                          maint_days, unplanned_extra)
+
+    days = list(range(1, 8))
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=days, y=est_nothing, mode="lines+markers",
+                             name="Do nothing (forecast)",
+                             line=dict(color=COLORS["RED"])))
+    fig.add_trace(go.Scatter(x=days, y=est_plan, mode="lines+markers",
+                             name="Our plan (forecast)",
+                             line=dict(color=COLORS["GREEN"])))
+    fig.add_trace(go.Scatter(x=days, y=true_plan, mode="lines+markers",
+                             name="Our plan (backtest on NASA true RUL)",
+                             line=dict(color=COLORS["GREEN"], dash="dot")))
+    fig.update_layout(height=420, xaxis_title="Day from today",
+                      yaxis_title="Aircraft available (out of 100)",
+                      yaxis=dict(range=[60, 101]),
+                      title="Fleet availability over the next 7 days")
+    st.plotly_chart(fig)
+
+    st.write("**Surprise (unplanned) failures in the next 7 days**")
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("Forecast: do nothing", u_est_nothing)
+    k2.metric("Forecast: our plan", u_est_plan, u_est_plan - u_est_nothing,
+              delta_color="inverse")
+    k3.metric("Backtest (true RUL): do nothing", u_true_nothing)
+    k4.metric("Backtest (true RUL): our plan", u_true_plan, u_true_plan - u_true_nothing,
+              delta_color="inverse")
+
+    red_plan = plan[plan["status"] == "RED"]
+    st.write("**Supply and slot problems among RED aircraft**")
+    r1, r2, r3 = st.columns(3)
+    r1.metric("Spares SHORT", int(red_plan["spare_status"].str.startswith("SHORT").sum()))
+    r2.metric("No slot in 7 days", int(red_plan["action"].str.contains("ESCALATE").sum()))
+    r3.metric("Slot after likely failure", int(red_plan["action"].str.contains("may fail").sum()))
+
+    st.caption(
+        "How to read this: the dotted line is a backtest. It replays the plan against the "
+        "true remaining life that NASA provides for the 100 test engines. The forecast lines "
+        "start lower than the backtest because our estimate includes a 10-flight safety "
+        "margin, so it is deliberately cautious. ASSUMPTIONS: 3 flights per aircraft per "
+        "day; an aircraft is unavailable while in the hangar; an aircraft that fails before "
+        "its slot loses the extra 'surprise' days; repaired aircraft do not fail again "
+        "within the week; 'do nothing' means fixing only after a failure."
+    )
+
+    with st.expander("See the maintenance plan behind these numbers"):
+        cols_show = ["aircraft", "base", "status", "plan_rul", "spare_status", "action",
+                     "priority_score"]
+        st.dataframe(style_status(plan[plan["status"] != "GREEN"]
+                                  .sort_values("priority_score", ascending=False)[cols_show]))
