@@ -336,5 +336,6 @@ with tab5:
                                   .sort_values("priority_score", ascending=False)[cols_show]))
 
 st.markdown("---")
-st.caption("Source code: github.com/jeevikagowda7/sih26-airpower-predictive-maintenance  |  "
+st.caption("Source code: [github.com/jeevikagowda7/sih26-airpower-predictive-maintenance]"
+           "(https://github.com/jeevikagowda7/sih26-airpower-predictive-maintenance)  |  "
            "Engine data: NASA C-MAPSS (public, simulated)  |  Spares and slots: simulated by the team")
