@@ -1,6 +1,8 @@
-# Air Power: Predictive Maintenance & Fleet Availability
+# SkyReady: Predict the Failure, Plan the Fix
 
-**Smart India Hackathon 2026 | PS 26249 | Ministry of Defence (Defence Services Staff College)**
+**Live dashboard:** https://sih26-airpower-predictive-maintenance-fh8slanhpswy9ar7cqkuapp.streamlit.app/
+
+**Smart India Hackathon 2026 | PS 26249 "Air Power: Predictive Maintenance & Fleet Availability" | Ministry of Defence (Defence Services Staff College)**
 
 A working prototype that answers three questions for a fleet commander:
 1. **Which aircraft are close to failure?** (AI estimate of Remaining Useful Life)
@@ -19,8 +21,8 @@ The design lets real maintenance, spares and health-monitoring data replace thes
 ## Results (measured on 100 unseen NASA test engines)
 | Measure | Value |
 |---|---|
-| Average error (MAE) of the Random Forest | **13.1 flights** vs capped truth (14.2 vs raw truth). Lazy "always average" guess: 34.8 |
-| RMSE | **18.5 flights** vs capped truth (19.5 vs raw truth). Lazy guess: 41.9 |
+| Average error (MAE) of the Random Forest | **13.1 flights** (lazy "always average" guess: 34.8). 14.2 against the uncapped NASA answers |
+| RMSE | **18.5 flights** (lazy guess: 41.9). 19.5 against the uncapped NASA answers |
 | Engines truly within 30 flights of failure that we flagged RED | **21 of 25** (4 missed) |
 | False RED alarms | **1** |
 | Engines where the model was 20+ flights too optimistic | 17 of 100 (this is why we add a 10-flight safety margin) |
@@ -29,7 +31,8 @@ Backtest of the 7-day plan against NASA's true remaining life (default assumptio
 
 ## How it works
 | Step | File | What it does |
-| 1    | `step1_check_data.py` | Loads and checks the NASA files |
+|---|---|---|
+| 1 | `step1_check_data.py` | Loads and checks the NASA files |
 | 3 | `step3_train_model.py` | Trains the Random Forest and reports honest accuracy |
 | 4 | `step4_fleet_priority.py` | Green/Yellow/Red status, simulated spares and slots, scheduler, priority score |
 | 6 | `step6_explain.py` | "Why is it RED": sensors that drifted most from the aircraft's own early life |
@@ -60,4 +63,4 @@ streamlit run app.py
 Train on the harder NASA sets (FD002 to FD004), add model-based explanations (SHAP), use real health-monitoring and maintenance records, and connect to live spares and hangar data.
 
 ## Reference
-A. Saxena, K. Goebel, D. Simon, N. Eklund, "Damage Propagation Modeling for Aircraft Engine Run-to-Failure Simulation", Proc. 1st International Conference on Prognostics and Health Management (PHM08), Denver CO, 2008. Data: NASA Prognostics Center of Excellence.
+A. Saxena, K. Goebel, D. Simon, N. Eklund, "Damage Propagation Modeling for Aircraft Engine Run-to-Failure Simulation", Proc. 1st International Conference on Prognostics and Health Management (PHM'08), Denver CO, 2008. Data: NASA Prognostics Center of Excellence.
